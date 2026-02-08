@@ -14,9 +14,9 @@ MODELS=(
 echo "Pulling models to Ollama..."
 for model in "${MODELS[@]}"; do
     echo "Pulling $model..."
-    docker exec rag-ollama ollama pull "$model"
+    docker exec ollama ollama pull "$model"
 done
 
 echo ""
 echo "Available models:"
-docker exec rag-ollama ollama list
+docker exec ollama ollama list

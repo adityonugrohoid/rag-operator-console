@@ -1,8 +1,12 @@
-FROM python:3.12-slim
+# Query service - lightweight, no ML dependencies needed
+FROM rag-operator-console-base:latest
+
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy shared code and service-specific code
 COPY shared/ ./shared/
 COPY services/__init__.py ./services/
 COPY services/query/ ./services/query/
+
+# Run the service
 CMD ["uvicorn", "services.query.main:app", "--host", "0.0.0.0", "--port", "8003"]

@@ -40,6 +40,20 @@ async def ingest_document(file: UploadFile = File(...)) -> DocumentResponse:
         "doc_id": doc_id, "document_filename": file.filename
     })
 
+    # Remove existing chunks for this filename (idempotent re-ingestion)
+    try:
+        existing = chroma_client.collection.get(
+            where={"filename": file.filename}, include=[]
+        )
+        if existing and existing.get("ids"):
+            chroma_client.collection.delete(ids=existing["ids"])
+            logger.info("Removed existing chunks", extra={
+                "filename": file.filename,
+                "removed_count": len(existing["ids"]),
+            })
+    except Exception:
+        pass  # Collection may be empty or not support where filter
+
     try:
         with tempfile.NamedTemporaryFile(
             delete=False, suffix=os.path.splitext(file.filename)[1]

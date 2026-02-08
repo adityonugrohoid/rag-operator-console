@@ -33,7 +33,7 @@ QUERY_URL = os.getenv("QUERY_URL", "http://localhost:8003")
 async def upload_document(file: UploadFile = File(...)) -> DocumentResponse:
     """Upload and ingest a document."""
     try:
-        logger.info("Document upload", extra={"filename": file.filename})
+        logger.info("Document upload", extra={"document_filename": file.filename})
         async with httpx.AsyncClient(timeout=60.0) as client:
             content = await file.read()
             response = await client.post(

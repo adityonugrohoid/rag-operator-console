@@ -1,6 +1,5 @@
-"""RAG Operator Console - extends Phase 1 Streamlit design."""
+"""RAG Operator Console - RAG pipeline with full observability."""
 import os
-import time
 import glob as glob_module
 
 import streamlit as st
@@ -10,7 +9,6 @@ st.set_page_config(page_title="RAG Operator Console", layout="wide")
 st.title("RAG Operator Console")
 
 API_URL = os.getenv("API_URL", "http://localhost:8080")
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 AVAILABLE_MODELS = [
     {"id": "gemma2:2b", "size": "1.6GB", "tier": "fast"},
@@ -127,219 +125,155 @@ with st.sidebar:
     except requests.RequestException:
         st.markdown("Services: :red[unreachable]")
 
-    try:
-        ollama_resp = requests.get(f"{OLLAMA_HOST}/api/tags", timeout=5)
-        color = "green" if ollama_resp.status_code == 200 else "red"
-        status = "connected" if ollama_resp.status_code == 200 else "unreachable"
-        st.markdown(f"Ollama: :{color}[{status}]")
-    except requests.RequestException:
-        st.markdown("Ollama: :red[unreachable]")
 
 # -------------------------------------------------------------------------
-# Main area: tabs for Generate, Compare, RAG Query
+# Main area: RAG Query (with 1-turn clarification context)
 # -------------------------------------------------------------------------
-tab_generate, tab_compare, tab_rag = st.tabs(
-    ["Generate", "Compare Models", "RAG Query"]
-)
+if "prev_question" not in st.session_state:
+    st.session_state.prev_question = None
+    st.session_state.prev_answer = None
 
-# --- Generate Tab (Phase 1 carry-forward) ---
-with tab_generate:
-    prompt = st.text_area("Enter your prompt:", height=150, key="gen_prompt")
-    if st.button("Generate", type="primary", disabled=not prompt, key="gen_btn"):
-        with st.spinner(f"Generating with {selected_model}..."):
-            try:
-                resp = requests.post(
-                    f"{OLLAMA_HOST}/api/generate",
-                    json={
-                        "model": selected_model,
-                        "prompt": prompt,
-                        "options": {
-                            "temperature": temperature,
-                            "num_predict": max_tokens,
-                        },
-                        "stream": False,
-                    },
-                    timeout=120,
+# Show previous turn context if available
+if st.session_state.prev_question:
+    with st.expander("Previous turn (used as clarification context)", expanded=False):
+        st.markdown(f"**Q:** {st.session_state.prev_question}")
+        st.markdown(f"**A:** {st.session_state.prev_answer[:300]}...")
+    if st.button("Clear context", key="clear_ctx"):
+        st.session_state.prev_question = None
+        st.session_state.prev_answer = None
+        st.rerun()
+
+rag_query = st.text_area("Enter your question:", height=150, key="rag_prompt")
+
+if st.button("Query RAG", type="primary", disabled=not rag_query, key="rag_btn"):
+    # Build clarification context from previous turn
+    clarification_context = None
+    if st.session_state.prev_question and st.session_state.prev_answer:
+        clarification_context = (
+            f"Q: {st.session_state.prev_question}\n"
+            f"A: {st.session_state.prev_answer}"
+        )
+
+    with st.spinner(f"Querying RAG pipeline with {selected_model}..."):
+        try:
+            payload = {
+                "query": rag_query,
+                "model": selected_model,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+            if clarification_context:
+                payload["clarification_context"] = clarification_context
+
+            resp = requests.post(
+                f"{API_URL}/query",
+                json=payload,
+                timeout=120,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+
+            # Store current turn as context for next query
+            st.session_state.prev_question = rag_query
+            st.session_state.prev_answer = result.get("answer", "")
+
+            # --- Response Area ---
+            st.markdown("### Answer")
+            st.write(result.get("answer", ""))
+
+            sources = result.get("sources", [])
+            if sources:
+                st.markdown(
+                    "**Sources:** "
+                    + ", ".join(f"`{s}`" for s in sources)
                 )
-                resp.raise_for_status()
-                result = resp.json()
-                st.markdown("### Response")
-                st.write(result.get("response", ""))
-                eval_count = result.get("eval_count", 0)
-                eval_dur = result.get("eval_duration", 0)
-                latency_ms = round(eval_dur / 1e6, 1) if eval_dur else 0
-                st.caption(
-                    f"Model: {selected_model} | "
-                    f"Latency: {latency_ms}ms | "
-                    f"Tokens: {eval_count}"
-                )
-            except requests.RequestException as e:
-                st.error(f"Generation failed: {e}")
 
-# --- Compare Tab (Phase 1 carry-forward) ---
-with tab_compare:
-    compare_prompt = st.text_area(
-        "Enter your prompt:", height=150, key="cmp_prompt"
-    )
-    compare_models = st.multiselect(
-        "Select models to compare",
-        MODEL_OPTIONS,
-        default=["llama3.2:3b", "mistral:7b"],
-    )
-    if st.button("Compare", type="primary", disabled=not compare_prompt, key="cmp_btn"):
-        if len(compare_models) < 2:
-            st.warning("Select at least 2 models to compare.")
-        else:
-            cols = st.columns(len(compare_models))
-            for col, model_id in zip(cols, compare_models):
-                with col:
-                    st.markdown(f"### {model_id}")
-                    with st.spinner(f"Generating with {model_id}..."):
-                        try:
-                            resp = requests.post(
-                                f"{OLLAMA_HOST}/api/generate",
-                                json={
-                                    "model": model_id,
-                                    "prompt": compare_prompt,
-                                    "options": {
-                                        "temperature": temperature,
-                                        "num_predict": max_tokens,
-                                    },
-                                    "stream": False,
-                                },
-                                timeout=120,
-                            )
-                            resp.raise_for_status()
-                            result = resp.json()
-                            st.write(result.get("response", ""))
-                            eval_count = result.get("eval_count", 0)
-                            eval_dur = result.get("eval_duration", 0)
-                            latency_ms = round(eval_dur / 1e6, 1) if eval_dur else 0
-                            st.caption(
-                                f"Latency: {latency_ms}ms | Tokens: {eval_count}"
-                            )
-                        except requests.RequestException as e:
-                            st.error(f"Failed: {e}")
+            # --- Pipeline Metrics Bar ---
+            metrics = result.get("pipeline_metrics", {})
+            st.markdown("---")
+            st.markdown("### Pipeline Metrics")
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Retrieval", f"{metrics.get('retrieval_ms', 0):.0f} ms")
+            m2.metric("Assembly", f"{metrics.get('assembly_ms', 0):.0f} ms")
+            m3.metric("LLM", f"{metrics.get('llm_ms', 0):.0f} ms")
+            m4.metric("Total", f"{metrics.get('total_ms', 0):.0f} ms")
 
-# --- RAG Query Tab (Phase 2 centerpiece) ---
-with tab_rag:
-    rag_query = st.text_area(
-        "Enter your question:", height=150, key="rag_prompt"
-    )
+            t1, t2, t3 = st.columns(3)
+            t1.metric("Model", result.get("model", ""))
+            t2.metric("Tokens Generated", metrics.get("tokens_generated", 0))
+            t3.metric(
+                "Throughput",
+                f"{metrics.get('tokens_per_sec', 0):.1f} tok/s",
+            )
 
-    if st.button("Query RAG", type="primary", disabled=not rag_query, key="rag_btn"):
-        with st.spinner(f"Querying RAG pipeline with {selected_model}..."):
-            try:
-                resp = requests.post(
-                    f"{API_URL}/query",
-                    json={
-                        "query": rag_query,
-                        "model": selected_model,
-                        "temperature": temperature,
-                        "max_tokens": max_tokens,
-                    },
-                    timeout=120,
-                )
-                resp.raise_for_status()
-                result = resp.json()
+            # --- Prompt Assembly Panel ---
+            assembly = result.get("prompt_assembly", {})
+            with st.expander("Prompt Assembly Debug", expanded=False):
+                budget = assembly.get("budget", 0)
+                total_tok = assembly.get("total_tokens", 0)
 
-                # --- Response Area ---
-                st.markdown("### Answer")
-                st.write(result.get("answer", ""))
+                layers = [
+                    (
+                        "Layer 1: System Instructions",
+                        assembly.get("system_tokens", 0),
+                        "PINNED",
+                    ),
+                    (
+                        "Layer 2: Retrieved Documents",
+                        assembly.get("retrieved_docs_tokens", 0),
+                        "PINNED",
+                    ),
+                    (
+                        "Layer 3: Clarification Context",
+                        assembly.get("clarification_tokens", 0),
+                        "PINNED" if assembly.get("clarification_included") else "DROPPED",
+                    ),
+                    (
+                        "Layer 4: User Question",
+                        assembly.get("question_tokens", 0),
+                        "PINNED",
+                    ),
+                ]
 
-                sources = result.get("sources", [])
-                if sources:
+                for name, tokens, status in layers:
+                    status_color = (
+                        ":green[PINNED]" if status == "PINNED"
+                        else ":red[DROPPED]"
+                    )
                     st.markdown(
-                        "**Sources:** "
-                        + ", ".join(f"`{s}`" for s in sources)
+                        f"**{name}** - {tokens} tokens - {status_color}"
                     )
 
-                # --- Pipeline Metrics Bar ---
-                metrics = result.get("pipeline_metrics", {})
-                st.markdown("---")
-                st.markdown("### Pipeline Metrics")
-                m1, m2, m3, m4 = st.columns(4)
-                m1.metric("Retrieval", f"{metrics.get('retrieval_ms', 0):.0f} ms")
-                m2.metric("Assembly", f"{metrics.get('assembly_ms', 0):.0f} ms")
-                m3.metric("LLM", f"{metrics.get('llm_ms', 0):.0f} ms")
-                m4.metric("Total", f"{metrics.get('total_ms', 0):.0f} ms")
+                st.markdown(f"**Docs used:** {assembly.get('retrieved_docs_used', 0)}")
 
-                t1, t2, t3 = st.columns(3)
-                t1.metric("Model", result.get("model", ""))
-                t2.metric("Tokens Generated", metrics.get("tokens_generated", 0))
-                t3.metric(
-                    "Throughput",
-                    f"{metrics.get('tokens_per_sec', 0):.1f} tok/s",
-                )
+                if budget > 0:
+                    st.progress(
+                        min(total_tok / budget, 1.0),
+                        text=f"Token budget: {total_tok} / {budget}",
+                    )
 
-                # --- Prompt Assembly Panel ---
-                assembly = result.get("prompt_assembly", {})
-                with st.expander("Prompt Assembly Debug", expanded=False):
-                    budget = assembly.get("budget", 0)
-                    total_tok = assembly.get("total_tokens", 0)
-
-                    layers = [
-                        (
-                            "Layer 1: System Instructions",
-                            assembly.get("system_tokens", 0),
-                            "PINNED",
-                        ),
-                        (
-                            "Layer 2: Retrieved Documents",
-                            assembly.get("retrieved_docs_tokens", 0),
-                            "PINNED",
-                        ),
-                        (
-                            "Layer 3: Clarification Context",
-                            assembly.get("clarification_tokens", 0),
-                            "PINNED" if assembly.get("clarification_included") else "DROPPED",
-                        ),
-                        (
-                            "Layer 4: User Question",
-                            assembly.get("question_tokens", 0),
-                            "PINNED",
-                        ),
-                    ]
-
-                    for name, tokens, status in layers:
-                        status_color = (
-                            ":green[PINNED]" if status == "PINNED"
-                            else ":red[DROPPED]"
-                        )
+            # --- Retrieved Chunks Panel ---
+            chunks = result.get("retrieved_chunks", [])
+            if chunks:
+                with st.expander(
+                    f"Retrieved Chunks ({len(chunks)})", expanded=False
+                ):
+                    for idx, chunk in enumerate(chunks):
+                        included = chunk.get("included_in_prompt", False)
+                        icon = "+" if included else "-"
+                        pii = " [PII]" if chunk.get("pii_detected") else ""
                         st.markdown(
-                            f"**{name}** - {tokens} tokens - {status_color}"
+                            f"**{icon} Chunk {idx + 1}** | "
+                            f"Score: {chunk.get('score', 0):.4f} | "
+                            f"Source: `{chunk.get('source', '')}` | "
+                            f"Index: {chunk.get('chunk_index', 0)} | "
+                            f"Tokens: {chunk.get('tokens', 0)}"
+                            f"{pii}"
                         )
+                        st.text(chunk.get("preview", ""))
+                        if not included:
+                            st.caption("(not included in prompt - budget exceeded)")
+                        st.markdown("---")
 
-                    st.markdown(f"**Docs used:** {assembly.get('retrieved_docs_used', 0)}")
-
-                    if budget > 0:
-                        st.progress(
-                            min(total_tok / budget, 1.0),
-                            text=f"Token budget: {total_tok} / {budget}",
-                        )
-
-                # --- Retrieved Chunks Panel ---
-                chunks = result.get("retrieved_chunks", [])
-                if chunks:
-                    with st.expander(
-                        f"Retrieved Chunks ({len(chunks)})", expanded=False
-                    ):
-                        for idx, chunk in enumerate(chunks):
-                            included = chunk.get("included_in_prompt", False)
-                            icon = "+" if included else "-"
-                            pii = " [PII]" if chunk.get("pii_detected") else ""
-                            st.markdown(
-                                f"**{icon} Chunk {idx + 1}** | "
-                                f"Score: {chunk.get('score', 0):.4f} | "
-                                f"Source: `{chunk.get('source', '')}` | "
-                                f"Index: {chunk.get('chunk_index', 0)} | "
-                                f"Tokens: {chunk.get('tokens', 0)}"
-                                f"{pii}"
-                            )
-                            st.text(chunk.get("preview", ""))
-                            if not included:
-                                st.caption("(not included in prompt - budget exceeded)")
-                            st.markdown("---")
-
-            except requests.RequestException as e:
-                st.error(f"RAG query failed: {e}")
+        except requests.RequestException as e:
+            st.error(f"RAG query failed: {e}")

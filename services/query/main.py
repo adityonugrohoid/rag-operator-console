@@ -28,7 +28,7 @@ app = FastAPI(title="Query Service")
 
 config = Config.from_env()
 llm_client = OllamaClient(host=config.OLLAMA_HOST, model=config.LLM_MODEL)
-assembler = PromptAssembler(max_context_tokens=3000)
+assembler = PromptAssembler(max_context_tokens=4096)
 
 RETRIEVAL_URL = os.getenv("RETRIEVAL_URL", "http://localhost:8002")
 

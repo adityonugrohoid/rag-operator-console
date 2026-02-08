@@ -1,7 +1,11 @@
-FROM python:3.12-slim
+# API Gateway - lightweight, no ML dependencies needed
+FROM rag-operator-console-base:latest
+
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy shared code and service-specific code
 COPY shared/ ./shared/
 COPY services/api_gateway/ ./services/api_gateway/
+
+# Run the service
 CMD ["uvicorn", "services.api_gateway.main:app", "--host", "0.0.0.0", "--port", "8080"]

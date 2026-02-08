@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+httpx
+pydantic
+streamlit
+requests
+chromadb
+tiktoken
+python-multipart
+pytest

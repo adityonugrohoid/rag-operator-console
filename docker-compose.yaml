@@ -1,30 +1,26 @@
 services:
-  ollama:
-    image: ollama/ollama:latest
-    container_name: rag-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # Base images for optimized builds
+  base:
+    build:
+      context: .
+      dockerfile: Dockerfile.base
+    image: rag-operator-console-base:latest
+    profiles:
+      - build-only
+
+  ml-base:
+    build:
+      context: .
+      dockerfile: Dockerfile.ml
+    image: rag-operator-console-ml-base:latest
+    profiles:
+      - build-only
 
   chroma:
     image: chromadb/chroma:latest
     container_name: rag-chroma
     ports:
-      - "8000:8000"
+      - "2000:8000"
     volumes:
       - chroma_data:/chroma/chroma
     environment:
@@ -41,9 +37,10 @@ services:
     build:
       context: .
       dockerfile: services/ingestion/Dockerfile
+    image: rag-operator-console-ingestion:latest
     container_name: rag-ingestion
     ports:
-      - "8001:8001"
+      - "2001:8001"
     environment:
       CHROMA_HOST: http://chroma:8000
     depends_on:
@@ -54,9 +51,10 @@ services:
     build:
       context: .
       dockerfile: services/retrieval/Dockerfile
+    image: rag-operator-console-retrieval:latest
     container_name: rag-retrieval
     ports:
-      - "8002:8002"
+      - "2002:8002"
     environment:
       CHROMA_HOST: http://chroma:8000
     depends_on:
@@ -67,16 +65,19 @@ services:
     build:
       context: .
       dockerfile: services/query/Dockerfile
+    image: rag-operator-console-query:latest
     container_name: rag-query
     ports:
-      - "8003:8003"
+      - "2003:8003"
     environment:
       OLLAMA_HOST: http://ollama:11434
       CHROMA_HOST: http://chroma:8000
       RETRIEVAL_URL: http://retrieval:8002
       LLM_MODEL: llama3.2:3b
+    networks:
+      - default
+      - ollama-network
     depends_on:
-      - ollama
       - retrieval
     restart: unless-stopped
 
@@ -84,9 +85,10 @@ services:
     build:
       context: .
       dockerfile: services/api_gateway/Dockerfile
+    image: rag-operator-console-api_gateway:latest
     container_name: rag-api-gateway
     ports:
-      - "8080:8080"
+      - "2080:8080"
     environment:
       INGESTION_URL: http://ingestion:8001
       RETRIEVAL_URL: http://retrieval:8002
@@ -101,16 +103,20 @@ services:
     build:
       context: .
       dockerfile: console/Dockerfile
+    image: rag-operator-console-console:latest
     container_name: rag-console
     ports:
-      - "8501:8501"
+      - "2501:8501"
     environment:
       API_URL: http://api_gateway:8080
-      OLLAMA_HOST: http://ollama:11434
     depends_on:
       - api_gateway
     restart: unless-stopped
 
+networks:
+  ollama-network:
+    external: true
+    name: ollama-runtime-network  # Phase 0: ollama-runtime (planned)
+
 volumes:
-  ollama_data:
   chroma_data:
