@@ -12,6 +12,8 @@ Full RAG implementation with explicit prompt assembly and operator visibility fo
 - **Multi-Model** - 6 local Ollama models across 3 tiers (fast/balanced/quality)
 - **Operator Console** - Streamlit UI focused on RAG query debugging
 
+![RAG Operator Console - document management sidebar, model selection, and RAG query with source-grounded answer](docs/images/console_doc_management.png)
+
 ## Architecture
 
 ```mermaid
@@ -67,6 +69,14 @@ In the Prompt Assembly Debug panel, you will see:
 
 Use the "Clear context" button above the input to reset and start a fresh conversation.
 
+**Turn 2 input** - previous turn context is shown above the query input, with a "Clear context" button to reset:
+
+![Previous turn context panel showing Turn 1 Q&A, follow-up question input, and Clear context button](docs/images/prev_turn_context.png)
+
+**Turn 2 result** - Layer 3 (Clarification Context) changes from DROPPED to PINNED with 144 tokens:
+
+![Prompt Assembly Debug after follow-up question - Layer 3 Clarification Context now PINNED at 144 tokens, budget 3805/4096](docs/images/pinned_context.png)
+
 ## Quick Start
 
 ### Prerequisites
@@ -116,6 +126,12 @@ The operator console shows every stage of the pipeline:
 - **Prompt Assembly Panel** - 4 layers with token counts, PINNED/DROPPED status, budget progress bar
 - **Retrieved Chunks Panel** - similarity scores, source docs, chunk index, PII flags, included-in-prompt indicator
 - **Previous Turn Context** - collapsible panel showing the Q&A used as clarification context
+
+![Source citations and pipeline metrics - retrieval, assembly, LLM timing, tokens generated, throughput](docs/images/source_cite_metric.png)
+
+![Prompt Assembly Debug - 4 layers with token counts, PINNED/DROPPED status, and token budget progress bar](docs/images/prompt_assembly_debug.png)
+
+![Retrieved Chunks panel - similarity scores, source documents, chunk indices, token counts, and text previews](docs/images/retrieved_chunks.png)
 
 ## API Usage
 
