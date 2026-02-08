@@ -1,0 +1,70 @@
+"""ChromaDB client for vector storage and retrieval."""
+import chromadb
+from chromadb.config import Settings
+from typing import List, Dict, Any, Optional
+import logging
+import os
+
+logger = logging.getLogger(__name__)
+
+
+class ChromaClient:
+    """Client for ChromaDB vector database"""
+
+    def __init__(self, host: Optional[str] = None):
+        host = host or os.getenv("CHROMA_HOST", "http://localhost:8000")
+        logger.info(f"Connecting to ChromaDB at {host}")
+
+        host_clean = host.replace("http://", "").replace("https://", "")
+        if ":" in host_clean:
+            hostname, port_str = host_clean.split(":")
+            port = int(port_str)
+        else:
+            hostname = host_clean
+            port = 8000
+
+        self.client = chromadb.HttpClient(
+            host=hostname,
+            port=port,
+            settings=Settings(anonymized_telemetry=False),
+        )
+        self.collection = self.client.get_or_create_collection(
+            name="documents",
+            metadata={"hnsw:space": "cosine"},
+        )
+        logger.info("ChromaDB client initialized")
+
+    def _ensure_collection(self) -> None:
+        """Re-fetch collection reference (handles recreation)."""
+        self.collection = self.client.get_or_create_collection(
+            name="documents",
+            metadata={"hnsw:space": "cosine"},
+        )
+
+    def add(
+        self,
+        embeddings: List[List[float]],
+        documents: List[str],
+        metadatas: List[Dict[str, Any]],
+        ids: List[str],
+    ) -> None:
+        self._ensure_collection()
+        self.collection.add(
+            embeddings=embeddings,
+            documents=documents,
+            metadatas=metadatas,
+            ids=ids,
+        )
+        logger.info(f"Added {len(documents)} documents to ChromaDB")
+
+    def query(
+        self, query_embeddings: List[List[float]], n_results: int = 5
+    ) -> Dict[str, Any]:
+        self._ensure_collection()
+        return self.collection.query(
+            query_embeddings=query_embeddings, n_results=n_results
+        )
+
+    def count(self) -> int:
+        self._ensure_collection()
+        return self.collection.count()

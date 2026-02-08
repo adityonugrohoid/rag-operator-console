@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+httpx
+pydantic
+streamlit
+requests
+chromadb
+sentence-transformers
+tiktoken
+python-multipart
+pytest

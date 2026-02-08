@@ -1,0 +1,116 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: rag-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: rag-chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      ANONYMIZED_TELEMETRY: "false"
+      PERSIST_DIRECTORY: /chroma/chroma
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: services/ingestion/Dockerfile
+    container_name: rag-ingestion
+    ports:
+      - "8001:8001"
+    environment:
+      CHROMA_HOST: http://chroma:8000
+    depends_on:
+      - chroma
+    restart: unless-stopped
+
+  retrieval:
+    build:
+      context: .
+      dockerfile: services/retrieval/Dockerfile
+    container_name: rag-retrieval
+    ports:
+      - "8002:8002"
+    environment:
+      CHROMA_HOST: http://chroma:8000
+    depends_on:
+      - chroma
+    restart: unless-stopped
+
+  query:
+    build:
+      context: .
+      dockerfile: services/query/Dockerfile
+    container_name: rag-query
+    ports:
+      - "8003:8003"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      CHROMA_HOST: http://chroma:8000
+      RETRIEVAL_URL: http://retrieval:8002
+      LLM_MODEL: llama3.2:3b
+    depends_on:
+      - ollama
+      - retrieval
+    restart: unless-stopped
+
+  api_gateway:
+    build:
+      context: .
+      dockerfile: services/api_gateway/Dockerfile
+    container_name: rag-api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      INGESTION_URL: http://ingestion:8001
+      RETRIEVAL_URL: http://retrieval:8002
+      QUERY_URL: http://query:8003
+    depends_on:
+      - ingestion
+      - retrieval
+      - query
+    restart: unless-stopped
+
+  console:
+    build:
+      context: .
+      dockerfile: console/Dockerfile
+    container_name: rag-console
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://api_gateway:8080
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      - api_gateway
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  chroma_data:
