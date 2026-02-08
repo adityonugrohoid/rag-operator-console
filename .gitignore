@@ -43,3 +43,6 @@ htmlcov/
 # Logs
 logs/
 *.log
+
+# Archive files
+archive/
