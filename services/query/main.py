@@ -56,16 +56,49 @@ async def query(request: QueryRequest) -> QueryResponse:
         retrieval_ms = (time.time() - retrieval_start) * 1000
 
         chunks = retrieval_data.get("chunks", [])
+
+        # If no documents indexed, fall back to direct LLM chat (no RAG)
         if not chunks:
+            logger.info("No documents found, using direct LLM mode")
+            llm_start = time.time()
+
+            # Build simple messages without RAG context
+            messages = [
+                {"role": "system", "content": "You are a helpful AI assistant."},
+                {"role": "user", "content": request.query}
+            ]
+
+            # Add clarification context if provided
+            if request.clarification_context:
+                messages.insert(1, {
+                    "role": "user",
+                    "content": f"Previous conversation:\n{request.clarification_context}"
+                })
+
+            llm_result = llm_client.chat(
+                messages=messages,
+                model=use_model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+            llm_ms = (time.time() - llm_start) * 1000
+
+            answer = llm_result["response"]
+            tokens_generated = llm_result.get("eval_count", 0)
+            tokens_per_sec = round(tokens_generated / (llm_ms / 1000), 1) if llm_ms > 0 else 0
             total_ms = (time.time() - pipeline_start) * 1000
+
             return QueryResponse(
                 success=True,
-                answer="I couldn't find any relevant information in the documents.",
+                answer=answer,
                 sources=[],
                 model=use_model,
                 pipeline_metrics=PipelineMetrics(
                     retrieval_ms=round(retrieval_ms, 1),
+                    llm_ms=round(llm_ms, 1),
                     total_ms=round(total_ms, 1),
+                    tokens_generated=tokens_generated,
+                    tokens_per_sec=tokens_per_sec,
                 ),
             )
 
