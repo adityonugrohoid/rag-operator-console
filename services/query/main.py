@@ -22,6 +22,7 @@ from shared.models.schemas import (
     RetrievedChunkInfo,
 )
 from services.query.prompt_assembler import PromptAssembler
+import tiktoken
 
 logger = setup_logging("query_service")
 app = FastAPI(title="Query Service")
@@ -62,9 +63,22 @@ async def query(request: QueryRequest) -> QueryResponse:
             logger.info("No documents found, using direct LLM mode")
             llm_start = time.time()
 
+            # Calculate token counts for metadata
+            encoder = tiktoken.get_encoding("cl100k_base")
+            system_content = "You are a helpful AI assistant."
+            system_tokens = len(encoder.encode(system_content))
+            question_tokens = len(encoder.encode(request.query))
+
+            clarification_tokens = 0
+            clarification_included = False
+            if request.clarification_context:
+                clarification_content = f"Previous conversation:\n{request.clarification_context}"
+                clarification_tokens = len(encoder.encode(clarification_content))
+                clarification_included = True
+
             # Build simple messages without RAG context
             messages = [
-                {"role": "system", "content": "You are a helpful AI assistant."},
+                {"role": "system", "content": system_content},
                 {"role": "user", "content": request.query}
             ]
 
@@ -88,6 +102,9 @@ async def query(request: QueryRequest) -> QueryResponse:
             tokens_per_sec = round(tokens_generated / (llm_ms / 1000), 1) if llm_ms > 0 else 0
             total_ms = (time.time() - pipeline_start) * 1000
 
+            # Build prompt assembly metadata for direct mode
+            total_prompt_tokens = system_tokens + question_tokens + clarification_tokens
+
             return QueryResponse(
                 success=True,
                 answer=answer,
@@ -100,6 +117,17 @@ async def query(request: QueryRequest) -> QueryResponse:
                     tokens_generated=tokens_generated,
                     tokens_per_sec=tokens_per_sec,
                 ),
+                prompt_assembly=PromptAssemblyMetadata(
+                    system_tokens=system_tokens,
+                    retrieved_docs_tokens=0,
+                    retrieved_docs_used=0,
+                    clarification_included=clarification_included,
+                    clarification_tokens=clarification_tokens,
+                    question_tokens=question_tokens,
+                    total_tokens=total_prompt_tokens,
+                    budget=4096,
+                ),
+                retrieved_chunks=[],
             )
 
         # --- Stage 2: Prompt Assembly ---
