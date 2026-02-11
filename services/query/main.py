@@ -46,17 +46,21 @@ async def query(request: QueryRequest) -> QueryResponse:
         max_tokens = request.max_tokens
 
         # --- Stage 1: Retrieval ---
-        retrieval_start = time.time()
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            retrieval_response = await client.post(
-                f"{RETRIEVAL_URL}/retrieve",
-                json={"query": request.query, "top_k": 5},
-            )
-            retrieval_response.raise_for_status()
-            retrieval_data = retrieval_response.json()
-        retrieval_ms = (time.time() - retrieval_start) * 1000
-
-        chunks = retrieval_data.get("chunks", [])
+        if request.skip_retrieval:
+            logger.info("Skipping retrieval (skip_retrieval=True)")
+            chunks = []
+            retrieval_ms = 0
+        else:
+            retrieval_start = time.time()
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                retrieval_response = await client.post(
+                    f"{RETRIEVAL_URL}/retrieve",
+                    json={"query": request.query, "top_k": 5},
+                )
+                retrieval_response.raise_for_status()
+                retrieval_data = retrieval_response.json()
+            retrieval_ms = (time.time() - retrieval_start) * 1000
+            chunks = retrieval_data.get("chunks", [])
 
         # If no documents indexed, fall back to direct LLM chat (no RAG)
         if not chunks:

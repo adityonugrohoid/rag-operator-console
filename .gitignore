@@ -32,8 +32,8 @@ data/chroma/
 data/minio/
 data/redis/
 
-# Model cache
-models/
+# Model cache (root level only, not shared/models/)
+/models/
 
 # Test / Coverage
 .pytest_cache/

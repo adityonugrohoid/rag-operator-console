@@ -19,6 +19,7 @@ def test_query_request_defaults():
     assert req.temperature == 0.7
     assert req.max_tokens == 512
     assert req.clarification_context is None
+    assert req.skip_retrieval is False
 
 
 def test_query_request_with_params():
@@ -96,6 +97,15 @@ def test_document_response():
     )
     assert resp.pii_detected is True
     assert resp.chunks_created == 5
+
+
+def test_query_request_skip_retrieval():
+    """QueryRequest skip_retrieval can be set to True."""
+    req = QueryRequest(query="test", skip_retrieval=True)
+    assert req.skip_retrieval is True
+
+    req2 = QueryRequest(query="test", skip_retrieval=False)
+    assert req2.skip_retrieval is False
 
 
 def test_chunk_metadata():

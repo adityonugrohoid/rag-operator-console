@@ -82,6 +82,21 @@ async def list_documents():
         raise HTTPException(status_code=500, detail=f"Retrieval error: {str(e)}")
 
 
+@app.post("/documents/ingest-samples")
+async def ingest_samples():
+    """Trigger ingestion of sample documents."""
+    try:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(f"{INGESTION_URL}/ingest-samples")
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPError as e:
+        logger.error("Sample ingestion error", extra={"error": str(e)})
+        raise HTTPException(
+            status_code=500, detail=f"Sample ingestion error: {str(e)}"
+        )
+
+
 @app.delete("/documents")
 async def clear_documents():
     """Clear all documents from the vector database."""
