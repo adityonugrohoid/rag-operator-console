@@ -1,11 +1,22 @@
+# Backend
 fastapi
 uvicorn
 httpx
 pydantic
+
+# UI
 streamlit
 requests
+
+# Vector Database
 chromadb
+
+# ML / Embeddings
 sentence-transformers
 tiktoken
+
+# Utilities
 python-multipart
+
+# Testing
 pytest

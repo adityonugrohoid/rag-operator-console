@@ -13,6 +13,8 @@ services:
       context: .
       dockerfile: Dockerfile.ml
     image: rag-operator-console-ml-base:latest
+    depends_on:
+      - base
     profiles:
       - build-only
 
@@ -73,7 +75,7 @@ services:
       OLLAMA_HOST: http://ollama:11434
       CHROMA_HOST: http://chroma:8000
       RETRIEVAL_URL: http://retrieval:8002
-      LLM_MODEL: gemma2:2b
+      LLM_MODEL: llama3.2:3b
     networks:
       - default
       - ollama-network

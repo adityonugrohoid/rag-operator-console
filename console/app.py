@@ -11,12 +11,9 @@ st.title("RAG Operator Console")
 API_URL = os.getenv("API_URL", "http://localhost:8080")
 
 AVAILABLE_MODELS = [
-    {"id": "gemma2:2b", "size": "1.6GB", "tier": "fast"},
-    {"id": "llama3.2:1b", "size": "1.3GB", "tier": "fast"},
-    {"id": "phi3:3.8b", "size": "2.2GB", "tier": "balanced"},
-    {"id": "llama3.2:3b", "size": "2.0GB", "tier": "balanced"},
-    {"id": "mistral:7b", "size": "4.4GB", "tier": "quality"},
-    {"id": "llama3.1:8b", "size": "4.9GB", "tier": "quality"},
+    {"id": "llama3.2:3b", "size": "2.0GB", "tier": "Meta"},
+    {"id": "qwen2.5:3b", "size": "1.9GB", "tier": "Alibaba"},
+    {"id": "phi3.5:3.8b", "size": "2.2GB", "tier": "Microsoft"},
 ]
 
 MODEL_OPTIONS = [m["id"] for m in AVAILABLE_MODELS]
@@ -26,7 +23,7 @@ MODEL_OPTIONS = [m["id"] for m in AVAILABLE_MODELS]
 # -------------------------------------------------------------------------
 with st.sidebar:
     st.header("Model Selection")
-    # Default to gemma2:2b (index 0) for initial selection
+    # Default to llama3.2:3b (index 0) for initial selection
     selected_model = st.selectbox("Active Model", MODEL_OPTIONS, index=0)
     model_info = next(m for m in AVAILABLE_MODELS if m["id"] == selected_model)
     st.caption(f"Size: {model_info['size']} | Tier: {model_info['tier']}")
