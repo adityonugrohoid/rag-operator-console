@@ -1,18 +1,57 @@
-# RAG Operator Console
+# GenAI Portfolio Suite – Phase 2: RAG Operator Console
 
 Full RAG implementation with explicit prompt assembly and operator visibility for debugging and validation.
 
-**Part of the [GenAI Portfolio Suite](https://github.com/adityonugrohoid) - Phase 2: RAG Pipeline + Operator Debugging UI.**
+**Part of the [GenAI Portfolio Suite](https://github.com/adityonugrohoid).**  
+> **Phase:** 2 – RAG Pipeline & Operator Debugging UI
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Highlights](#highlights)
+- [Architecture](#architecture)
+- [Prompt Assembly](#prompt-assembly)
+- [2-Turn Clarification Context](#2-turn-clarification-context)
+- [Quick Start](#quick-start)
+- [Service URLs](#service-urls)
+- [RAG Query – Full Observability](#rag-query--full-observability)
+- [API Usage](#api-usage)
+- [Available Models](#available-models)
+- [Docker Optimization](#docker-optimization)
+- [Testing](#testing)
+- [Sample Documents](#sample-documents)
+- [Project Structure](#project-structure)
+- [Tech Stack](#tech-stack)
+- [Author](#author)
+- [License](#license)
+
+---
+
+## Overview
+
+`rag-operator-console` is a **RAG pipeline plus operator console** designed for:
+
+- Inspecting and debugging RAG behavior
+- Visualizing prompt assembly and token budgets
+- Understanding which documents and chunks influence answers
+
+It uses a shared Ollama runtime from **Phase 0: [ollama-runtime](https://github.com/adityonugrohoid/ollama-runtime)**.
+
+---
 
 ## Highlights
 
-- **Prompt Assembly** - explicit 4-layer prompt ordering with token-aware budgeting (4096 token context)
-- **Full Observability** - pipeline metrics, prompt assembly debug, retrieved chunks panel
-- **1-Turn Clarification** - previous Q&A automatically carried as context for follow-up questions
-- **Multi-Model** - 6 local Ollama models across 3 tiers (fast/balanced/quality)
-- **Operator Console** - Streamlit UI focused on RAG query debugging
+- **Prompt Assembly** – explicit 4-layer prompt ordering with token-aware budgeting (4096 token context)
+- **Full Observability** – pipeline metrics, prompt assembly debug, retrieved chunks panel
+- **1-Turn Clarification** – previous Q&A automatically carried as context for follow-up questions
+- **Multi-Model** – 6 local Ollama models across 3 tiers (fast / balanced / quality)
+- **Operator Console** – Streamlit UI focused on RAG query debugging
 
 ![RAG Operator Console - document management sidebar, model selection, and RAG query with source-grounded answer](docs/images/console_doc_management.png)
+
+---
 
 ## Architecture
 
@@ -30,7 +69,10 @@ graph LR
     Query --> Assembler["PromptAssembler"]
 ```
 
-Ollama runs as a shared service from [Phase 0: ollama-runtime](https://github.com/adityonugrohoid/ollama-runtime). All phases connect via the `ollama-runtime-network` Docker network.
+Ollama runs as a shared service from **Phase 0: [ollama-runtime](https://github.com/adityonugrohoid/ollama-runtime)**.  
+All phases connect via the `ollama-runtime-network` Docker network.
+
+---
 
 ## Prompt Assembly
 
@@ -43,15 +85,18 @@ Each query is assembled with strict 4-layer ordering:
 | 3 | Clarification Context | Previous turn only, dropped first under token pressure |
 | 4 | Current User Question | Pinned (always included) |
 
-Token budget: 4096 tokens. When budget is tight, Layer 3 (clarification) is dropped first to preserve document grounding. The operator console visualizes each layer with token counts and PINNED/DROPPED status.
+Token budget: 4096 tokens. When budget is tight, Layer 3 (clarification) is dropped first to preserve document grounding.  
+The operator console visualizes each layer with token counts and PINNED/DROPPED status.
+
+---
 
 ## 2-Turn Clarification Context
 
 The console tracks the previous question and answer. On the next query, this context is injected as Layer 3 so the LLM can handle follow-up questions.
 
-**Example - 2-turn conversation:**
+**Example – 2-turn conversation:**
 
-```
+```text
 Turn 1: "What authentication does the API use?"
   --> Layer 3: (empty, no previous turn)
   --> Answer: "The API uses Bearer token and API key authentication..."
@@ -64,18 +109,18 @@ Turn 2: "What are the rate limits?"
 ```
 
 In the Prompt Assembly Debug panel, you will see:
-- **Turn 1**: Layer 3 shows `0 tokens - DROPPED` (no previous context)
-- **Turn 2**: Layer 3 shows `~25 tokens - PINNED` (previous Q&A included)
+- **Turn 1**: Layer 3 shows `0 tokens – DROPPED` (no previous context)
+- **Turn 2**: Layer 3 shows `~25 tokens – PINNED` (previous Q&A included)
 
-Use the "Clear context" button above the input to reset and start a fresh conversation.
-
-**Turn 2 input** - previous turn context is shown above the query input, with a "Clear context" button to reset:
+Use the **“Clear context”** button above the input to reset and start a fresh conversation.
 
 ![Previous turn context panel showing Turn 1 Q&A, follow-up question input, and Clear context button](docs/images/prev_turn_context.png)
 
-**Turn 2 result** - Layer 3 (Clarification Context) changes from DROPPED to PINNED with 144 tokens:
+**Turn 2 result** – Layer 3 (Clarification Context) changes from DROPPED to PINNED with 144 tokens:
 
 ![Prompt Assembly Debug after follow-up question - Layer 3 Clarification Context now PINNED at 144 tokens, budget 3805/4096](docs/images/pinned_context.png)
+
+---
 
 ## Quick Start
 
@@ -83,7 +128,7 @@ Use the "Clear context" button above the input to reset and start a fresh conver
 
 - Docker and Docker Compose
 - NVIDIA GPU + drivers (for Ollama GPU acceleration)
-- [Phase 0: ollama-runtime](https://github.com/adityonugrohoid/ollama-runtime) running
+- **Phase 0:** [ollama-runtime](https://github.com/adityonugrohoid/ollama-runtime) running
 
 ### Start Services
 
@@ -105,7 +150,9 @@ cd ~/projects/rag-operator-console
 # http://localhost:2501
 ```
 
-### Service URLs
+---
+
+## Service URLs
 
 | Service | URL | Description |
 |---------|-----|-------------|
@@ -117,21 +164,25 @@ cd ~/projects/rag-operator-console
 | Query | http://localhost:2003 | Prompt assembly + LLM generation |
 | Ollama | http://localhost:11434 | Shared LLM runtime (Phase 0) |
 
-## RAG Query - Full Observability
+---
+
+## RAG Query – Full Observability
 
 The operator console shows every stage of the pipeline:
 
-- **Response Area** - answer with inline source citations
-- **Pipeline Metrics** - timing per stage (Retrieval, Assembly, LLM), tokens generated, throughput (tok/s)
-- **Prompt Assembly Panel** - 4 layers with token counts, PINNED/DROPPED status, budget progress bar
-- **Retrieved Chunks Panel** - similarity scores, source docs, chunk index, PII flags, included-in-prompt indicator
-- **Previous Turn Context** - collapsible panel showing the Q&A used as clarification context
+- **Response Area** – answer with inline source citations
+- **Pipeline Metrics** – timing per stage (Retrieval, Assembly, LLM), tokens generated, throughput (tok/s)
+- **Prompt Assembly Panel** – 4 layers with token counts, PINNED/DROPPED status, budget progress bar
+- **Retrieved Chunks Panel** – similarity scores, source docs, chunk index, PII flags, included-in-prompt indicator
+- **Previous Turn Context** – collapsible panel showing the Q&A used as clarification context
 
 ![Source citations and pipeline metrics - retrieval, assembly, LLM timing, tokens generated, throughput](docs/images/source_cite_metric.png)
 
 ![Prompt Assembly Debug - 4 layers with token counts, PINNED/DROPPED status, and token budget progress bar](docs/images/prompt_assembly_debug.png)
 
 ![Retrieved Chunks panel - similarity scores, source documents, chunk indices, token counts, and text previews](docs/images/retrieved_chunks.png)
+
+---
 
 ## API Usage
 
@@ -164,16 +215,22 @@ curl -X DELETE http://localhost:2080/documents
 curl http://localhost:2080/health
 ```
 
+---
+
 ## Available Models
 
-| Model | Size | Tier |
-|-------|------|------|
-| gemma2:2b | 1.6 GB | Fast |
-| llama3.2:1b | 1.3 GB | Fast |
-| llama3.2:3b | 2.0 GB | Balanced (default) |
-| phi3:3.8b | 2.2 GB | Balanced |
-| mistral:7b | 4.4 GB | Quality |
-| llama3.1:8b | 4.9 GB | Quality |
+> **Default model across Phase 0–1–2:** `gemma2:2b`
+
+| Model        | Size  | Tier     | Notes                        |
+|-------------|-------|----------|------------------------------|
+| gemma2:2b   | 1.6 GB| Fast     | **Default** – suite-wide     |
+| llama3.2:1b | 1.3 GB| Fast     | Ultra-fast, smallest memory  |
+| phi3:3.8b   | 2.2 GB| Balanced | Reasoning, code, structured  |
+| llama3.2:3b | 2.0 GB| Balanced | General-purpose local RAG    |
+| mistral:7b  | 4.4 GB| Quality  | Strong instruction-following |
+| llama3.1:8b | 4.9 GB| Quality  | Highest quality, complex RAG |
+
+---
 
 ## Docker Optimization
 
@@ -186,6 +243,8 @@ Two-tier base image strategy to minimize image sizes:
 
 The ML base pre-downloads the `all-MiniLM-L6-v2` embedding model. Build base images first with `./scripts/build.sh`, then `docker compose up`.
 
+---
+
 ## Testing
 
 ```bash
@@ -194,9 +253,12 @@ python3 -m pytest tests/ -v
 
 15 tests covering prompt assembly, schemas, and client behavior.
 
+---
+
 ## Sample Documents
 
 12 documents across 6 categories:
+
 - Telecom (network performance, RAN optimization, OSS/BSS)
 - Enterprise (employee handbook, IT security)
 - Support (product troubleshooting, features)
@@ -204,9 +266,11 @@ python3 -m pytest tests/ -v
 - Education (machine learning, Python basics)
 - Technical (API reference)
 
+---
+
 ## Project Structure
 
-```
+```text
 rag-operator-console/
   services/
     api_gateway/         API Gateway (:2080)
@@ -232,20 +296,27 @@ rag-operator-console/
   LICENSE
 ```
 
+---
+
 ## Tech Stack
 
-- **LLM Runtime**: Ollama (via Phase 0)
-- **Backend**: FastAPI + Python 3.12
-- **Operator UI**: Streamlit
-- **Vector DB**: ChromaDB
-- **Embeddings**: all-MiniLM-L6-v2 (sentence-transformers)
-- **Token Counting**: tiktoken (cl100k_base)
-- **Infrastructure**: Docker Compose
+- **LLM Runtime:** Ollama (via Phase 0)
+- **Backend:** FastAPI + Python 3.12
+- **Operator UI:** Streamlit
+- **Vector DB:** ChromaDB
+- **Embeddings:** all-MiniLM-L6-v2 (sentence-transformers)
+- **Token Counting:** tiktoken (cl100k_base)
+- **Infrastructure:** Docker Compose
+
+---
 
 ## Author
 
-**Adityo Nugroho** - [github.com/adityonugrohoid](https://github.com/adityonugrohoid)
+**Adityo Nugroho** – [github.com/adityonugrohoid](https://github.com/adityonugrohoid)
+
+---
 
 ## License
 
-[MIT](LICENSE)
+MIT License – see [LICENSE](LICENSE).
+

@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 AVAILABLE_MODELS = [
     {"id": "gemma2:2b", "size": "1.6GB", "tier": "fast"},
     {"id": "llama3.2:1b", "size": "1.3GB", "tier": "fast"},
-    {"id": "llama3.2:3b", "size": "2.0GB", "tier": "balanced"},
     {"id": "phi3:3.8b", "size": "2.2GB", "tier": "balanced"},
+    {"id": "llama3.2:3b", "size": "2.0GB", "tier": "balanced"},
     {"id": "mistral:7b", "size": "4.4GB", "tier": "quality"},
     {"id": "llama3.1:8b", "size": "4.9GB", "tier": "quality"},
 ]
@@ -27,7 +27,7 @@ class OllamaClient:
         model: Optional[str] = None,
     ):
         self.host = host or os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        self.default_model = model or os.getenv("LLM_MODEL", "llama3.2:3b")
+        self.default_model = model or os.getenv("LLM_MODEL", "gemma2:2b")
 
     def chat(
         self,

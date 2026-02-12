@@ -28,7 +28,7 @@ def test_client_defaults():
     """Client initializes with default host and model."""
     client = OllamaClient()
     assert client.host == "http://localhost:11434"
-    assert client.default_model == "llama3.2:3b"
+    assert client.default_model == "gemma2:2b"
 
 
 def test_client_custom_config():

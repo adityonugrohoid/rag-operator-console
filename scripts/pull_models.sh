@@ -5,8 +5,8 @@ set -e
 MODELS=(
     "gemma2:2b"
     "llama3.2:1b"
-    "llama3.2:3b"
     "phi3:3.8b"
+    "llama3.2:3b"
     "mistral:7b"
     "llama3.1:8b"
 )
