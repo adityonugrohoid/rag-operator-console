@@ -6,7 +6,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**RAG pipeline with operator console for prompt assembly visibility, retrieval inspection, and side-by-side response debugging**
+**RAG pipeline with operator console for prompt assembly, retrieval inspection, and side-by-side response debugging**
 
 [Getting Started](#getting-started) | [Usage](#usage) | [Architecture](#architecture)
 
@@ -31,8 +31,8 @@
 - [Project Structure](#project-structure)
 - [Testing](#testing)
 - [Deployment](#deployment)
-- [Related Projects](#related-projects)
 - [Security](#security)
+- [Related Projects](#related-projects)
 - [License](#license)
 - [Author](#author)
 
